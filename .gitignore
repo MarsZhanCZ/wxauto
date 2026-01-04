@@ -13,3 +13,6 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+
+# FAISS 索引目录
+faiss_index/

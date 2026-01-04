@@ -5,3 +5,13 @@ psutil
 pyperclip
 requests
 python-dotenv
+
+# LangChain RAG 相关依赖
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-openai>=0.2.0
+langchain-text-splitters>=0.3.0
+langgraph>=0.2.0
+faiss-cpu>=1.7.4
+openpyxl>=3.1.0
+pandas>=2.0.0

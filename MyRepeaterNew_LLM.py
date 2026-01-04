@@ -54,14 +54,12 @@ class MessageRepeater:
         print("等待接收新消息，按 Ctrl+C 停止...")
         print("=" * 50)
     
-    def should_process_message(self, msg) -> bool:
+    def should_process_message(self, msg, chat_type: str = None) -> bool:
         """判断是否应该处理该消息
         
         Args:
             msg: 消息对象
-            
-        Returns:
-            bool: 是否应该处理
+            chat_type: 聊天类型，'friend' 表示私聊，'group' 表示群聊
         """
         # 过滤掉自己发送的消息
         if msg.attr == 'self':
@@ -71,15 +69,32 @@ class MessageRepeater:
         if msg.attr in ('system', 'time', 'tickle'):
             return False
         
-        # 只处理好友发送的消息（FriendMessage）
-        if not isinstance(msg, FriendMessage):
-            return False
-        
         # 检查消息是否已经处理过
         if msg.id in self.processed_msg_ids:
             return False
         
-        return True
+        # 根据 chat_type 判断是私聊还是群聊
+        if chat_type == 'friend':
+            # 私聊消息，直接处理
+            return True
+        elif chat_type == 'group':
+            # 群聊消息，只处理@我的消息
+            if hasattr(msg, 'content') and msg.content:
+                content = str(msg.content)
+                
+                # 检查是否被@了
+                if '@' in content:
+                    # 如果设置了昵称，检查是否@了我
+                    if self.my_nickname:
+                        if f"@{self.my_nickname}" in content:
+                            return True
+                    else:
+                        # 没有设置昵称时不自动回复群聊（避免误触发）
+                        return False
+            return False
+        else:
+            # 未知类型，不处理
+            return False
     
     def call_deepseek_api(self, user_message: str) -> Optional[str]:
         """调用DeepSeek API获取AI回复
