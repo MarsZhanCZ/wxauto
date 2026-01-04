@@ -4,6 +4,11 @@ import time
 from datetime import datetime
 from typing import Set, Optional
 import requests
+import os
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 
 class MessageRepeater:
@@ -24,7 +29,9 @@ class MessageRepeater:
         # 用于记录已处理的消息ID，确保每条消息只回复一次
         self.processed_msg_ids: Set[int] = set()
         # DeepSeek API配置
-        self.api_key = api_key or "sk-2e3314629b5f44a6a57f4188943ce488"
+        self.api_key = api_key or os.getenv('DEEPSEEK_API_KEY')
+        if not self.api_key:
+            raise ValueError("请在.env文件中设置DEEPSEEK_API_KEY或通过参数传入api_key")
         self.api_url = "https://api.deepseek.com/v1/chat/completions"
         
         # 默认系统提示词
