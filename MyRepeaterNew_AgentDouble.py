@@ -7,6 +7,8 @@ import os
 import sys
 from dotenv import load_dotenv
 import pandas as pd
+import requests
+import json
 
 # 强制刷新输出缓冲
 try:
@@ -227,10 +229,83 @@ def search_knowledge_base(query: str) -> str:
     return "\n\n---\n\n".join(results)
 
 
-class MessageRepeaterAgent:
-    """微信消息智能回复机器人（Agent 版本）
+# 定义百度搜索工具
+@tool
+def baidu_search_tool(query: str) -> str:
+    """
+    使用百度搜索API进行联网搜索，获取最新的网络信息。
     
-    使用 LangChain  的 Agent 架构，将 RAG 作为工具使用。
+    当用户询问需要实时信息、最新新闻、当前事件、股价、天气、最新技术动态等问题时，
+    或者本地知识库无法回答的问题时，使用此工具进行联网搜索。
+    
+    Args:
+        query: 搜索关键词或问题
+        
+    Returns:
+        搜索结果的文本内容，包含相关的网络信息
+    """
+    api_key = os.getenv('BAIDU_SEARCH_API_KEY')
+    if not api_key:
+        return "百度搜索API密钥未配置，无法进行联网搜索"
+    
+    url = 'https://qianfan.baidubce.com/v2/ai_search'
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+    
+    messages = [
+        {
+            "content": query,
+            "role": "user"
+        }
+    ]
+    
+    data = {
+        "messages": messages,
+        "search_source": "baidu_search_v2",
+        "search_recency_filter": "month"  # 搜索最近一个月的内容
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # 提取搜索结果的主要内容
+            if 'result' in result:
+                content = result['result']
+                # 如果返回的是字符串，直接返回
+                if isinstance(content, str):
+                    return content
+                # 如果是字典，尝试提取主要内容
+                elif isinstance(content, dict):
+                    if 'content' in content:
+                        return content['content']
+                    elif 'answer' in content:
+                        return content['answer']
+                    else:
+                        return str(content)
+            else:
+                # 如果没有result字段，返回整个响应的字符串形式
+                return str(result)
+                
+        else:
+            return f"搜索请求失败，状态码: {response.status_code}，错误信息: {response.text}"
+            
+    except requests.exceptions.Timeout:
+        return "搜索请求超时，请稍后再试"
+    except requests.exceptions.RequestException as e:
+        return f"搜索请求异常: {str(e)}"
+    except Exception as e:
+        return f"搜索过程中发生错误: {str(e)}"
+
+
+class MessageRepeaterAgent:
+    """微信消息智能回复机器人（双工具版本）
+    
+    使用 LangChain 的 Agent 架构，集成了 RAG 知识库搜索和百度联网搜索两个工具。
     """
     
     def __init__(self, debug: bool = False, rebuild_index: bool = False, my_nickname: str = None):
@@ -249,6 +324,11 @@ class MessageRepeaterAgent:
         self.siliconflow_key = os.getenv('SILICONFLOW_API_KEY')
         if not self.siliconflow_key:
             raise ValueError("请在.env文件中设置SILICONFLOW_API_KEY")
+        
+        # 百度搜索API Key（可选）
+        self.baidu_key = os.getenv('BAIDU_SEARCH_API_KEY')
+        if not self.baidu_key:
+            print("  ⚠ 未设置BAIDU_SEARCH_API_KEY，联网搜索功能将不可用")
         
         # 初始化微信
         self.wx = WeChat(debug=debug)
@@ -271,22 +351,30 @@ class MessageRepeaterAgent:
             max_tokens=200
         )
         
-        # 定义工具列表
-        self.tools = [search_knowledge_base]
+        # 定义工具列表（包含知识库搜索和联网搜索）
+        self.tools = [search_knowledge_base, baidu_search_tool]
         
         # 系统提示词
-        self.system_prompt = """你是一个友好的微信聊天助手，请遵循以下原则：
+        self.system_prompt = """你是一个友好的微信聊天助手，拥有两个强大的工具：
 
+1. search_knowledge_base: 搜索智云上海相关的本地知识库
+2. baidu_search_tool: 进行联网搜索获取最新信息
+
+请遵循以下原则：
+
+**工具使用策略：**
+- 当用户询问智云上海、智家服务、算力、AI服务等公司相关问题时，优先使用 search_knowledge_base
+- 当用户询问实时信息、最新新闻、天气、股价、当前事件等需要联网的问题时，使用 baidu_search_tool
+- 如果本地知识库没有找到相关信息，可以尝试联网搜索
+- 对于日常闲聊、问候等简单问题，可以直接回复，无需使用工具
+
+**回复风格：**
 1. 回复要像真人聊天一样自然亲切
 2. 控制回复长度在100字以内，简洁明了
 3. 绝对不要使用任何markdown格式（如**加粗**、*斜体*、`代码`等）
 4. 不要使用项目符号、编号列表等格式化内容
 5. 可以适当使用表情符号让对话生动
 6. 回复要像普通人发微信一样，不要显得太正式或机械
-
-当用户询问关于智云上海、智家服务、算力、AI服务等相关问题时，请先使用 search_knowledge_base 工具搜索知识库获取准确信息，然后基于搜索结果回答。
-
-如果问题与知识库无关（如日常闲聊、问候等），直接友好回复即可。
 
 用中文回复，语气自然友好。"""
         
@@ -298,8 +386,13 @@ class MessageRepeaterAgent:
         )
         
         print("=" * 50)
-        print("微信消息智能回复机器人（Agent版本）已启动...")
-        print("使用 LangChain Agent + RAG 工具进行智能回复")
+        print("微信消息智能回复机器人（双工具版本）已启动...")
+        print("集成功能：")
+        print("  ✓ RAG 知识库搜索（智云上海相关）")
+        if self.baidu_key:
+            print("  ✓ 百度联网搜索（实时信息）")
+        else:
+            print("  ✗ 百度联网搜索（未配置API Key）")
         print("等待接收新消息，按 Ctrl+C 停止...")
         print("=" * 50)
     
@@ -347,14 +440,23 @@ class MessageRepeaterAgent:
             # 提取最终回复
             messages = result.get("messages", [])
             if messages:
-                # 检查是否使用了工具
-                tool_used = any(isinstance(m, ToolMessage) for m in messages)
+                # 分析使用了哪些工具
+                tools_used = []
+                for msg in messages:
+                    if isinstance(msg, ToolMessage):
+                        if hasattr(msg, 'name'):
+                            tools_used.append(msg.name)
                 
                 # 获取最后一条 AI 消息
                 for msg in reversed(messages):
                     if isinstance(msg, AIMessage) and msg.content:
-                        if tool_used:
-                            print(f"  [Agent] 使用了 RAG 工具")
+                        if tools_used:
+                            tool_names = []
+                            if 'search_knowledge_base' in tools_used:
+                                tool_names.append('知识库')
+                            if 'baidu_search_tool' in tools_used:
+                                tool_names.append('联网搜索')
+                            print(f"  [Agent] 使用了工具: {', '.join(tool_names)}")
                         else:
                             print(f"  [Agent] 直接回复")
                         
@@ -368,10 +470,31 @@ class MessageRepeaterAgent:
             traceback.print_exc()
             return None
     
+    def check_wechat_status(self) -> bool:
+        """检查微信连接状态"""
+        try:
+            # 尝试获取微信窗口信息来检查连接状态
+            if hasattr(self.wx, '_api') and hasattr(self.wx._api, 'main_window'):
+                return self.wx._api.main_window is not None
+            return True  # 如果无法检查，假设连接正常
+        except Exception as e:
+            print(f"  ⚠ 检查微信状态时发生异常: {e}")
+            return False
+    
     def process_new_messages(self):
         """处理新消息"""
         try:
-            new_msg_data = self.wx.GetNextNewMessage(filter_mute=False)
+            # 增加对 wxauto 内部异常的处理
+            try:
+                new_msg_data = self.wx.GetNextNewMessage(filter_mute=False)
+            except KeyError as ke:
+                # wxauto 内部 KeyError，通常是消息ID管理问题
+                print(f"  ⚠ wxauto内部KeyError: {ke}，跳过本次消息检查")
+                return
+            except Exception as we:
+                # 其他 wxauto 相关异常
+                print(f"  ⚠ wxauto异常: {we}，跳过本次消息检查")
+                return
             
             if not new_msg_data or 'msg' not in new_msg_data:
                 return
@@ -384,38 +507,44 @@ class MessageRepeaterAgent:
                 messages = [messages]
             
             for msg in messages:
-                if not self.should_process_message(msg, chat_type):
+                try:
+                    if not self.should_process_message(msg, chat_type):
+                        continue
+                    
+                    self.processed_msg_ids.add(msg.id)
+                    
+                    msg_content = msg.content
+                    msg_sender = msg.sender
+                    
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    print(f"\n[{timestamp}] 收到来自 [{chat_name}] ({msg_sender}) 的消息:")
+                    print(f"  内容: {msg_content}")
+                    print(f"  消息类型: {'私聊' if chat_type == 'friend' else '群聊@我'}")
+                    
+                    print(f"  正在生成回复...")
+                    ai_reply = self.get_ai_reply(msg_content)
+                    
+                    if ai_reply:
+                        print(f"  AI回复: {ai_reply}")
+                        print(f"  正在发送回复给 [{chat_name}]...")
+                        try:
+                            result = self.wx.SendMsg(ai_reply, who=chat_name)
+                            if result:
+                                print(f"  ✓ 已成功发送回复")
+                            else:
+                                error_msg = result.get('message', '未知错误') if isinstance(result, dict) else '发送失败'
+                                print(f"  ✗ 发送失败: {error_msg}")
+                        except Exception as e:
+                            print(f"  ✗ 发送异常: {e}")
+                    else:
+                        print(f"  ✗ 未能获取AI回复，跳过发送")
+                    
+                    # 处理完一条消息后稍作延迟
+                    time.sleep(0.3)
+                    
+                except Exception as msg_e:
+                    print(f"  ✗ 处理单条消息时发生错误: {msg_e}")
                     continue
-                
-                self.processed_msg_ids.add(msg.id)
-                
-                msg_content = msg.content
-                msg_sender = msg.sender
-                
-                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                print(f"\n[{timestamp}] 收到来自 [{chat_name}] ({msg_sender}) 的消息:")
-                print(f"  内容: {msg_content}")
-                print(f"  消息类型: {'私聊' if chat_type == 'friend' else '群聊@我'}")
-                
-                print(f"  正在生成回复...")
-                ai_reply = self.get_ai_reply(msg_content)
-                
-                if ai_reply:
-                    print(f"  AI回复: {ai_reply}")
-                    print(f"  正在发送回复给 [{chat_name}]...")
-                    try:
-                        result = self.wx.SendMsg(ai_reply, who=chat_name)
-                        if result:
-                            print(f"  ✓ 已成功发送回复")
-                        else:
-                            error_msg = result.get('message', '未知错误')
-                            print(f"  ✗ 发送失败: {error_msg}")
-                    except Exception as e:
-                        print(f"  ✗ 发送异常: {e}")
-                else:
-                    print(f"  ✗ 未能获取AI回复，跳过发送")
-                
-                time.sleep(0.3)
                 
         except Exception as e:
             print(f"处理消息时发生错误: {e}")
@@ -424,17 +553,43 @@ class MessageRepeaterAgent:
     
     def run(self):
         """运行消息智能回复机器人"""
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+        
         try:
             while True:
-                self.process_new_messages()
-                time.sleep(0.5)
+                try:
+                    # 定期检查微信连接状态
+                    if consecutive_errors > 0 and not self.check_wechat_status():
+                        print("  ⚠ 微信连接可能已断开，请检查微信状态")
+                    
+                    self.process_new_messages()
+                    consecutive_errors = 0  # 成功处理后重置错误计数
+                    time.sleep(0.5)
+                    
+                except KeyboardInterrupt:
+                    raise  # 重新抛出键盘中断
+                    
+                except Exception as e:
+                    consecutive_errors += 1
+                    print(f"\n⚠ 主循环异常 (第{consecutive_errors}次): {e}")
+                    
+                    if consecutive_errors >= max_consecutive_errors:
+                        print(f"\n✗ 连续发生{max_consecutive_errors}次错误，程序可能存在严重问题")
+                        print("建议检查微信状态或重启程序")
+                        break
+                    
+                    # 错误后等待更长时间再重试
+                    wait_time = min(consecutive_errors * 2, 10)
+                    print(f"  等待{wait_time}秒后重试...")
+                    time.sleep(wait_time)
                 
         except KeyboardInterrupt:
             print("\n" + "=" * 50)
             print("程序已停止")
             print("=" * 50)
         except Exception as e:
-            print(f"\n发生错误: {e}")
+            print(f"\n发生严重错误: {e}")
             import traceback
             traceback.print_exc()
             print("程序已停止")
@@ -445,7 +600,7 @@ if __name__ == "__main__":
     
     print("正在解析命令行参数...")
     
-    parser = argparse.ArgumentParser(description='微信消息智能回复机器人（Agent版本）')
+    parser = argparse.ArgumentParser(description='微信消息智能回复机器人（双工具版本）')
     parser.add_argument('--rebuild', action='store_true', help='重新构建知识库索引')
     parser.add_argument('--debug', action='store_true', help='开启调试模式')
     parser.add_argument('--nickname', type=str, help='我的微信昵称，用于检测@我的消息')
