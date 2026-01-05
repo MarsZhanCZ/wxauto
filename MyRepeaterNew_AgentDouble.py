@@ -268,7 +268,9 @@ def baidu_search_tool(query: str) -> str:
     }
     
     try:
+        print(f"  [百度搜索] 正在搜索: {query[:30]}...")
         response = requests.post(url, headers=headers, json=data, timeout=10)
+        print(f"  [百度搜索] 响应状态: {response.status_code}")
         
         if response.status_code == 200:
             result = response.json()
@@ -333,6 +335,9 @@ class MessageRepeaterAgent:
         # 初始化微信
         self.wx = WeChat(debug=debug)
         self.processed_msg_ids: Set[int] = set()
+        # 增加基于内容的去重（防止同一消息被多次处理）
+        self.processed_msg_contents: dict = {}  # {(sender, content): timestamp}
+        self.content_dedup_window = 60  # 60秒内相同发送者的相同内容视为重复
         self.my_nickname = my_nickname
         
         # 初始化知识库
@@ -404,8 +409,19 @@ class MessageRepeaterAgent:
         if msg.attr in ('system', 'time', 'tickle'):
             return False
         
+        # 基于消息ID去重
         if msg.id in self.processed_msg_ids:
             return False
+        
+        # 基于内容+发送者去重（防止同一消息被多次触发）
+        current_time = time.time()
+        content_key = (getattr(msg, 'sender', ''), getattr(msg, 'content', ''))
+        
+        if content_key in self.processed_msg_contents:
+            last_time = self.processed_msg_contents[content_key]
+            if current_time - last_time < self.content_dedup_window:
+                print(f"  [去重] 跳过重复消息: {content_key[1][:20]}...")
+                return False
         
         if chat_type == 'friend':
             return True
@@ -512,6 +528,17 @@ class MessageRepeaterAgent:
                         continue
                     
                     self.processed_msg_ids.add(msg.id)
+                    
+                    # 记录内容用于去重
+                    content_key = (msg.sender, msg.content)
+                    self.processed_msg_contents[content_key] = time.time()
+                    
+                    # 清理过期的去重记录（避免内存泄漏）
+                    current_time = time.time()
+                    expired_keys = [k for k, v in self.processed_msg_contents.items() 
+                                   if current_time - v > self.content_dedup_window * 2]
+                    for k in expired_keys:
+                        del self.processed_msg_contents[k]
                     
                     msg_content = msg.content
                     msg_sender = msg.sender
