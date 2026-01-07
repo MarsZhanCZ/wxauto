@@ -1,350 +1,210 @@
-# wxauto
+# 微信智能回复机器人
 
-A Python library for automating WeChat interactions with a comprehensive suite of tools for message automation, contact management, and bot development.
+基于 wxauto 和 LangChain 的微信消息智能回复机器人，支持 RAG 知识库检索和联网搜索功能。
 
-## Project Overview
+## ✨ 功能特性
 
-wxauto is a powerful automation framework designed to interact with WeChat through its native Windows interface. It provides a high-level API for automating common WeChat operations, enabling developers to build sophisticated WeChat bots, automation scripts, and integration tools without deep knowledge of WeChat's internal architecture.
+- 🤖 **智能回复**：基于 DeepSeek AI 模型的自然语言对话
+- 📚 **RAG 知识库**：支持本地文档检索，提供准确的业务信息
+- 🌐 **联网搜索**：集成百度搜索，获取实时信息
+- 💬 **多场景支持**：支持私聊和群聊@回复
+- 🔄 **消息去重**：防止重复处理同一消息
+- 📊 **多格式文档**：支持 Excel QA 对和文本文件
 
-This project is particularly useful for:
-- Building WeChat chatbots and automation systems
-- Automating repetitive messaging tasks
-- Integrating WeChat with other services
-- Creating custom WeChat workflows
-- Testing and quality assurance automation
+## 🚀 快速开始
 
-## Features
+### 1. 环境准备
 
-- **Message Automation**: Send and receive messages programmatically
-- **Contact Management**: Access and manage WeChat contacts efficiently
-- **Chat Management**: Handle individual chats, group chats, and channels
-- **File Transfer**: Send and receive files through WeChat
-- **User Information**: Retrieve and manage user profile data
-- **Group Operations**: Create, modify, and manage WeChat groups
-- **Message Search**: Search through chat history
-- **Event Handling**: React to incoming messages and user events
-- **Session Management**: Handle multiple WeChat sessions
-- **Error Recovery**: Built-in error handling and recovery mechanisms
+#### 微信版本要求
+- **必须使用微信 3.9.X 版本**
+- 64位系统默认只能安装4.X版本，需要使用兼容性启动器：
+  - 下载：[WeChat 3.9 32bit 兼容性启动器](https://github.com/Skyler1n/WeChat3.9-32bit-Compatibility-Launcher)
+  - 安装微信 3.9.X 版本并保持登录状态
 
-## Installation Guide
-
-### Prerequisites
-
-- Python 3.7 or higher
-- Windows operating system (7, 8, 10, 11 or later)
-- WeChat application installed and accessible
-
-### Installation Steps
-
-1. **Clone the repository:**
+#### Python 环境
 ```bash
-git clone https://github.com/MarsZhanCZ/wxauto.git
-cd wxauto
-```
+# 创建虚拟环境（推荐）
+conda create -n wxauto python=3.10
+conda activate wxauto
 
-2. **Install dependencies:**
-```bash
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-3. **Verify installation:**
+### 2. 配置设置
+
+#### 环境变量配置
+复制 `.env.example` 为 `.env` 并填入你的 API Keys：
+
 ```bash
-python -c "import wxauto; print(wxauto.__version__)"
+cp .env.example .env
 ```
 
-### Optional Dependencies
+编辑 `.env` 文件：
+```env
+# DeepSeek API 配置（必需）
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
 
-For enhanced functionality, install optional dependencies:
+# SiliconFlow Embedding API 配置（RAG功能必需）
+SILICONFLOW_API_KEY=your_siliconflow_api_key_here
+
+# 百度搜索 API 配置（联网搜索功能，可选）
+BAIDU_SEARCH_API_KEY=your_baidu_search_api_key_here
+```
+
+#### API Key 获取方式
+- **DeepSeek API**：访问 [DeepSeek 开放平台](https://platform.deepseek.com/) 注册获取
+- **SiliconFlow API**：访问 [SiliconFlow](https://siliconflow.cn/) 注册获取
+- **百度搜索 API**：访问 [百度智能云](https://cloud.baidu.com/) 获取千帆大模型API
+
+### 3. 知识库准备
+
+将你的文档放入 `raw_docs` 目录：
+
+```
+raw_docs/
+├── 智云上海QA对.xlsx     # Excel格式的问答对
+├── 智云上海简介          # 纯文本文件
+├── 产品手册.xlsx         # 更多Excel文件
+└── 服务指南.txt          # 更多文本文件
+```
+
+**支持的文件格式：**
+- **Excel文件** (`.xlsx`, `.xls`)：自动识别问题/答案列
+- **文本文件**：任意纯文本文件，自动分块处理
+
+### 4. 运行机器人
+
+#### 基础版本（仅 RAG 知识库）
 ```bash
-pip install -r requirements-dev.txt  # For development
-pip install -r requirements-test.txt # For testing
+# 首次运行（构建知识库索引）
+python MyRepeaterNew_Agent.py --rebuild
+
+# 后续运行
+python MyRepeaterNew_Agent.py
+
+# 支持群聊@回复（需要指定昵称）
+python MyRepeaterNew_Agent.py --nickname "你的微信昵称"
 ```
 
-## Usage Examples
+#### 增强版本（RAG + 联网搜索）
+```bash
+# 双工具版本，支持知识库检索和联网搜索
+python MyRepeaterNew_AgentDouble.py --nickname "你的微信昵称"
+```
 
-### Basic Setup
+#### 命令行参数
+- `--rebuild`：重新构建知识库索引
+- `--debug`：开启调试模式
+- `--nickname "昵称"`：指定微信昵称，用于群聊@检测
 
+## 📖 版本说明
+
+| 文件 | 功能 | 适用场景 |
+|------|------|----------|
+| `MyRepeaterNew_LLM.py` | 基础版，仅LLM对话 | 简单聊天机器人 |
+| `MyRepeaterNew_RAG.py` | RAG版，知识库检索 | 企业客服、文档问答 |
+| `MyRepeaterNew_Agent.py` | Agent版，智能工具调用 | 灵活的AI助手 |
+| `MyRepeaterNew_AgentDouble.py` | 双工具版，RAG+联网搜索 | 全功能智能助手 |
+
+## 🔧 高级配置
+
+### 自定义系统提示词
 ```python
-from wxauto import WeChat
+from MyRepeaterNew_Agent import MessageRepeaterAgent
 
-# Initialize WeChat connection
-wechat = WeChat()
+custom_prompt = """你是一个专业的客服助手，请遵循以下原则：
+1. 始终保持礼貌和专业
+2. 快速准确地回答用户问题
+3. 如果无法解决问题，引导用户联系人工客服
+请用中文回复。"""
 
-# Verify connection
-if wechat.status:
-    print("Successfully connected to WeChat")
+repeater = MessageRepeaterAgent(system_prompt=custom_prompt)
+repeater.run()
 ```
 
-### Sending Messages
+### 知识库文档格式要求
 
-```python
-# Send text message to a contact
-wechat.send_message("Contact Name", "Hello, this is an automated message!")
+#### Excel QA 对文件
+Excel 文件应包含问题和答案两列，支持的列名：
+- 问题列：`Q`, `问题`, `问`
+- 答案列：`A`, `答案`, `答`, `回答`
 
-# Send message to a group
-wechat.send_message("Group Name", "Group message from automation script")
+示例：
+| 问题 | 答案 |
+|------|------|
+| 智云上海是什么？ | 智云上海是中国电信与上海市政府合作打造的... |
+| 如何开通服务？ | 您可以通过以下方式开通服务... |
 
-# Send with formatting
-wechat.send_message("Contact Name", "This is a **bold** message")
+#### 文本文件
+纯文本文件会被自动分割成多个文档块进行索引，支持各种格式的文档内容。
+
+## 🛠️ 开发文档
+
+- **wxauto 库文档**：查看 `docs/` 目录下的详细文档
+- **API 参考**：`docs/class/` 目录包含各个类的详细说明
+- **使用示例**：`docs/example.md` 提供了完整的使用示例
+
+## 📝 使用说明
+
+### 消息处理规则
+- ✅ **私聊消息**：自动回复所有好友私聊消息
+- ✅ **群聊@消息**：只回复群聊中@你的消息（需设置昵称）
+- ❌ **系统消息**：自动过滤系统通知、时间消息等
+- ❌ **重复消息**：60秒内相同内容不重复处理
+
+### 工具调用逻辑（Agent版本）
+1. **知识库优先**：企业相关问题优先搜索本地知识库
+2. **联网补充**：实时信息、新闻、天气等使用联网搜索
+3. **智能判断**：Agent 自动决定是否需要使用工具
+
+### 回复风格特点
+- 🗣️ **自然对话**：像真人聊天一样亲切自然
+- 📏 **简洁明了**：回复控制在100字以内
+- 🚫 **无格式化**：不使用 Markdown 格式，适合微信聊天
+- 😊 **表情符号**：适当使用表情让对话更生动
+
+## ⚠️ 注意事项
+
+1. **微信版本**：必须使用 3.9.X 版本，4.X 版本不兼容
+2. **网络连接**：需要稳定的网络连接调用 API
+3. **API 配额**：注意各个 API 的调用限制和费用
+4. **合规使用**：请遵守相关法律法规，仅用于合法用途
+5. **数据安全**：`.env` 文件包含敏感信息，不要提交到版本控制
+
+## 🐛 故障排除
+
+### 常见问题
+
+**Q: 程序启动后没有反应？**
+A: 检查微信是否已登录，版本是否为 3.9.X
+
+**Q: 提示找不到微信窗口？**
+A: 确保微信已打开并完全加载，尝试重启微信
+
+**Q: RAG 搜索没有结果？**
+A: 检查 `raw_docs` 目录是否有文档，运行时加 `--rebuild` 参数
+
+**Q: 群聊@消息没有回复？**
+A: 确保使用了 `--nickname` 参数指定正确的微信昵称
+
+**Q: API 调用失败？**
+A: 检查 `.env` 文件中的 API Key 是否正确配置
+
+### 调试模式
+```bash
+# 开启调试模式查看详细日志
+python MyRepeaterNew_Agent.py --debug --nickname "你的昵称"
 ```
 
-### Receiving Messages
+## 📄 许可证
 
-```python
-# Listen for incoming messages
-def handle_message(message):
-    sender = message.from_user
-    content = message.content
-    print(f"Received from {sender}: {content}")
+本项目仅用于学习和研究目的，请勿用于商业用途。使用时请遵守相关法律法规。
 
-wechat.on_message(handle_message)
-wechat.run()
-```
+## 🤝 贡献
 
-### Contact Management
-
-```python
-# Get all contacts
-contacts = wechat.get_contacts()
-for contact in contacts:
-    print(f"Contact: {contact.name}, ID: {contact.user_id}")
-
-# Get contact details
-contact = wechat.get_contact("Contact Name")
-print(f"Nickname: {contact.nickname}")
-print(f"Signature: {contact.signature}")
-
-# Search for contacts
-results = wechat.search_contacts("keyword")
-```
-
-### File Operations
-
-```python
-# Send a file
-wechat.send_file("Contact Name", "/path/to/file.pdf")
-
-# Send multiple files
-files = ["/path/to/file1.txt", "/path/to/file2.pdf"]
-for file_path in files:
-    wechat.send_file("Contact Name", file_path)
-```
-
-### Group Management
-
-```python
-# Create a new group
-members = ["Contact1", "Contact2", "Contact3"]
-group = wechat.create_group("New Group", members)
-
-# Get group information
-group_info = wechat.get_group("Group Name")
-print(f"Group members: {group_info.members}")
-
-# Add member to group
-wechat.add_group_member("Group Name", "Contact Name")
-
-# Remove member from group
-wechat.remove_group_member("Group Name", "Contact Name")
-```
-
-### Message Search
-
-```python
-# Search messages in a chat
-messages = wechat.search_messages("Chat Name", "keyword")
-for msg in messages:
-    print(f"{msg.time}: {msg.content}")
-
-# Search within date range
-from datetime import datetime, timedelta
-start_date = datetime.now() - timedelta(days=7)
-messages = wechat.search_messages("Chat Name", "keyword", 
-                                 start_date=start_date)
-```
-
-## Architecture
-
-### Component Structure
-
-```
-wxauto/
-├── core/
-│   ├── wechat.py           # Main WeChat interface
-│   ├── message.py          # Message handling
-│   └── contact.py          # Contact management
-├── automation/
-│   ├── sender.py           # Message sending
-│   ├── receiver.py         # Message receiving
-│   └── listener.py         # Event listening
-├── utils/
-│   ├── logger.py           # Logging utilities
-│   ├── exceptions.py       # Custom exceptions
-│   └── validators.py       # Input validation
-├── models/
-│   ├── message_model.py    # Message data models
-│   ├── contact_model.py    # Contact data models
-│   └── group_model.py      # Group data models
-└── config/
-    └── settings.py         # Configuration management
-```
-
-### Key Classes
-
-- **WeChat**: Main class for interacting with WeChat
-- **Message**: Represents a WeChat message
-- **Contact**: Represents a WeChat contact
-- **Group**: Represents a WeChat group
-- **Session**: Manages WeChat session lifecycle
-
-### Design Patterns
-
-- **Singleton Pattern**: WeChat connection management
-- **Observer Pattern**: Event handling and message listening
-- **Factory Pattern**: Message and contact creation
-- **Strategy Pattern**: Different communication strategies
-
-## Troubleshooting
-
-### Common Issues and Solutions
-
-#### Issue: "WeChat Not Found"
-**Cause**: WeChat application is not installed or not running
-**Solution**: 
-- Ensure WeChat is installed on your system
-- Launch WeChat application before running the script
-- Check that WeChat version is compatible (latest version recommended)
-
-#### Issue: "Connection Failed"
-**Cause**: Unable to establish communication with WeChat
-**Solution**:
-- Restart WeChat application
-- Check Windows firewall settings
-- Ensure only one instance of the automation script is running
-- Verify WeChat is not in offline mode
-
-#### Issue: "Message Not Sent"
-**Cause**: Contact not found or blocked
-**Solution**:
-- Verify contact name is correct (case-sensitive)
-- Check that you're not blocked by the contact
-- Ensure WeChat is actively running with focus
-- Wait a moment between consecutive messages
-
-#### Issue: "Timeout Errors"
-**Cause**: WeChat is slow to respond
-**Solution**:
-- Increase timeout settings in configuration
-- Check system resources and close unnecessary applications
-- Ensure stable network connection
-- Reduce the frequency of operations
-
-#### Issue: "Permission Denied"
-**Cause**: Insufficient permissions or account restrictions
-**Solution**:
-- Ensure WeChat account is in good standing
-- Check that you have permission to access the target chat
-- Verify no security restrictions are in place
-- Try with a different WeChat account if available
-
-### Debug Mode
-
-Enable debug logging for detailed troubleshooting:
-
-```python
-import logging
-from wxauto import WeChat
-
-logging.basicConfig(level=logging.DEBUG)
-wechat = WeChat(debug=True)
-```
-
-### Getting Help
-
-If issues persist:
-1. Check the [Issues](https://github.com/MarsZhanCZ/wxauto/issues) section
-2. Review the [Documentation](https://github.com/MarsZhanCZ/wxauto/wiki)
-3. Enable debug mode and collect logs
-4. Create a detailed issue report with logs and reproduction steps
-
-## Disclaimer
-
-**IMPORTANT LEGAL AND ETHICAL NOTICE**
-
-This project is provided for educational and legitimate automation purposes only. Users are responsible for:
-
-1. **Compliance with Laws**: Ensure your use complies with all applicable laws and regulations in your jurisdiction, including:
-   - WeChat Terms of Service
-   - Local privacy laws
-   - Data protection regulations (GDPR, CCPA, etc.)
-
-2. **Ethical Usage**:
-   - Do not use for spam, harassment, or malicious activities
-   - Respect user privacy and data protection
-   - Obtain proper consent before automating communications on behalf of others
-   - Do not attempt to breach WeChat security or authentication mechanisms
-
-3. **Account Responsibility**:
-   - You are solely responsible for any consequences of using this tool
-   - Unauthorized automation may violate WeChat Terms of Service
-   - Your WeChat account may be suspended or banned
-   - The authors assume no liability for account restrictions or bans
-
-4. **Liability**:
-   - This software is provided "as-is" without warranty
-   - The authors are not responsible for:
-     - Data loss or corruption
-     - Account suspensions or bans
-     - Legal consequences of misuse
-     - Any damages resulting from the use of this tool
-
-5. **Usage Restrictions**:
-   - Do not use for commercial spam
-   - Do not harvest data without consent
-   - Do not interfere with WeChat's normal operation
-   - Do not attempt to reverse-engineer or modify WeChat internals
-
-**By using this project, you agree to:**
-- Use it only for legitimate, legal purposes
-- Take full responsibility for your actions
-- Comply with all applicable laws and terms of service
-- Hold harmless the authors and contributors
-
-For questions about appropriate usage, please refer to WeChat's official guidelines and terms of service.
+欢迎提交 Issue 和 Pull Request 来改进这个项目！
 
 ---
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please ensure your code follows the project's style guidelines and includes appropriate tests.
-
-## Support
-
-For support, questions, or bug reports:
-- Open an issue on [GitHub Issues](https://github.com/MarsZhanCZ/wxauto/issues)
-- Check existing documentation and examples
-- Review the troubleshooting section above
-
-## Acknowledgments
-
-Thanks to all contributors who have helped make this project better!
-
-## Author
-
-**MarsZhanCZ**
-
----
-
-Last Updated: 2026-01-07
+**免责声明**：本项目仅用于技术学习和交流，请勿用于非法用途和商业用途。如因使用本项目产生任何法律纠纷，均与作者无关。

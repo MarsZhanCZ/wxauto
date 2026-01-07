@@ -338,7 +338,21 @@ class MessageRepeaterAgent:
         # 增加基于内容的去重（防止同一消息被多次处理）
         self.processed_msg_contents: dict = {}  # {(sender, content): timestamp}
         self.content_dedup_window = 60  # 60秒内相同发送者的相同内容视为重复
+        
+        # 设置昵称
         self.my_nickname = my_nickname
+        if not self.my_nickname:
+            # 尝试从微信获取当前用户昵称
+            try:
+                if hasattr(self.wx, 'CurrentUserName'):
+                    self.my_nickname = self.wx.CurrentUserName
+                    print(f"  ✓ 自动获取到昵称: {self.my_nickname}")
+                else:
+                    print("  ⚠ 无法自动获取昵称，群聊@检测将不可用")
+                    print("  建议使用 --nickname 参数指定昵称")
+            except Exception as e:
+                print(f"  ⚠ 获取昵称失败: {e}")
+                print("  建议使用 --nickname 参数指定昵称")
         
         # 初始化知识库
         print("正在初始化知识库...")
@@ -426,16 +440,32 @@ class MessageRepeaterAgent:
         if chat_type == 'friend':
             return True
         elif chat_type == 'group':
+            # 调试群聊消息
+            print(f"  [调试] 群聊消息检测:")
+            print(f"    消息内容: {getattr(msg, 'content', 'None')}")
+            print(f"    发送者: {getattr(msg, 'sender', 'None')}")
+            print(f"    我的昵称: {self.my_nickname}")
+            
             if hasattr(msg, 'content') and msg.content:
                 content = str(msg.content)
+                print(f"    是否包含@: {'@' in content}")
+                
                 if '@' in content:
                     if self.my_nickname:
-                        if f"@{self.my_nickname}" in content:
+                        at_me = f"@{self.my_nickname}" in content
+                        print(f"    是否@我: {at_me}")
+                        if at_me:
                             return True
                     else:
+                        print(f"    未设置昵称，不处理群聊消息")
                         return False
+                else:
+                    print(f"    消息不包含@，跳过")
+            else:
+                print(f"    消息内容为空，跳过")
             return False
         else:
+            print(f"  [调试] 未知聊天类型: {chat_type}")
             return False
     
     def get_ai_reply(self, user_message: str) -> Optional[str]:
